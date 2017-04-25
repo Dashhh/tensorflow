@@ -82,7 +82,8 @@ class ReferenceConvFunctor {
                   else {
                     input_source_value = 0;
                   }
-                  input_abs_sum += abs(input_source_value);
+                  const int input_value = input_source_value;
+                  //input_abs_sum += abs(input_source_value);
                   const T2 filter_source_value =
                       filter_data[(filter_y * filter_width * input_depth *
                                    filter_count) +
@@ -92,14 +93,14 @@ class ReferenceConvFunctor {
                   entries_counter += 1;
                   //sign function
                   const int filter_value = static_cast<int>((filter_source_value > 0) - (filter_source_value < 0));
-                  const int input_value = static_cast<int>((input_source_value > 0) - (input_source_value < 0));
+                  //const int input_value = static_cast<int>((input_source_value > 0) - (input_source_value < 0));
                   total += (input_value * filter_value);
                 }
               }
             }
             float alpha = filter_abs_sum / entries_counter;
-            float beta = input_abs_sum / entries_counter;
-            const int32_t output = total * alpha * beta;
+            //float beta = input_abs_sum / entries_counter;
+            const int32_t output = total * alpha;// * beta;
             output_data[(batch * output_height * output_width * filter_count) +
                         (out_y * output_width * filter_count) +
                         (out_x * filter_count) + out_channel] = output;
