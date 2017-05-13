@@ -27,7 +27,7 @@ import numpy as np
 @ops.RegisterGradient("BinaryConv2D")
 def _Conv2DGrad(op, grad):
   return [nn_ops.conv2d_backprop_input(
-      array_ops.shape(op.inputs[0]), op.inputs[1], grad, op.get_attr("strides"),
+      array_ops.shape(op.inputs[0]), tf.sign(op.inputs[1]), grad, op.get_attr("strides"),
       op.get_attr("padding"), op.get_attr("use_cudnn_on_gpu"),
       op.get_attr("data_format")),
           nn_ops.conv2d_backprop_filter(op.inputs[0],
