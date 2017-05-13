@@ -23,7 +23,7 @@ from tensorflow.python.ops import sparse_ops
 
 import tensorflow as tf
 
-conv_bin_module = tf.load_op_library('/home/osboxes/tensorflow_source/tensorflow/tensorflow/core/user_ops/conv_bin.so')
+conv_bin_module = tf.load_op_library('../tensorflow/core/user_ops/conv_bin.so')
 
 @ops.RegisterGradient("BinaryConv2D")
 def _Conv2DGrad(op, grad):

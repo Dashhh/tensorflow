@@ -60,9 +60,9 @@ class ReferenceConvFunctor {
             const int in_x_origin = (out_x * stride) - filter_left_offset;
             const int in_y_origin = (out_y * stride) - filter_top_offset;
             float total = 0;
-            int entries_counter = 0;
-            int filter_abs_sum = 0;            
-	    int input_abs_sum = 0;
+            int entries_counter = 0.0;
+            float filter_abs_sum = 0.0;            
+	    float input_abs_sum = 0.0;
             for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
               for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
                 for (int in_channel = 0; in_channel < input_depth;
@@ -82,7 +82,7 @@ class ReferenceConvFunctor {
                   else {
                     input_source_value = 0;
                   }
-                  const int input_value = input_source_value;
+                  const T1 input_value = input_source_value;
                   //input_abs_sum += abs(input_source_value);
                   const T2 filter_source_value =
                       filter_data[(filter_y * filter_width * input_depth *
@@ -99,8 +99,15 @@ class ReferenceConvFunctor {
               }
             }
             float alpha = filter_abs_sum / entries_counter;
+            //std::cout << "ENTRY" << std::endl;
+            //std::cout << "BATCH:" << batch << std::endl;
+            //std::cout << "OUT_X" << out_x << std::endl;
+            //std::cout << "OUT_Y:" << out_y << std::endl;
+            //std::cout << "FILTER_ENTRIES_COUNTER" << entries_counter << std::endl;
+            //std::cout << "ALPHA" << alpha << std::endl;
+            //std::cout << "FILTER_ABS_SUM" << filter_abs_sum << std::endl;
             //float beta = input_abs_sum / entries_counter;
-            const int32_t output = total * alpha;// * beta;
+            const float output = total * alpha;// * beta;
             output_data[(batch * output_height * output_width * filter_count) +
                         (out_y * output_width * filter_count) +
                         (out_x * filter_count) + out_channel] = output;
