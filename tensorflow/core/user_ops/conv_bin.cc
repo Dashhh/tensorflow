@@ -89,7 +89,7 @@ class ReferenceConvFunctor {
                                    filter_count) +
                                   (filter_x * input_depth * filter_count) +
                                   (in_channel * filter_count) + out_channel];
-                  filter_abs_sum += abs(filter_source_value);
+                  filter_abs_sum += filter_source_value > 0 ? filter_source_value : -filter_source_value;
                   entries_counter += 1;
                   //sign function
                   const int filter_value = static_cast<int>((filter_source_value > 0) - (filter_source_value < 0));
