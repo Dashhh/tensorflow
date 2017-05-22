@@ -80,7 +80,7 @@ class ReferenceConvFunctor {
 
     for (batch = 0; batch < input_batches; ++batch) {
       //K calculation
-      int* K = new int[output_height * output_width];
+      float* K = new float[output_height * output_width];
       for (out_y = 0; out_y < output_height; ++out_y) {
         for (out_x = 0; out_x < output_width; ++out_x) {
           for (out_channel = 0; out_channel < filter_count; ++out_channel) {
@@ -108,7 +108,7 @@ class ReferenceConvFunctor {
                   }
                   const T1 input_value = input_source_value > 0 ? input_source_value : -input_source_value;
                   const T2 filter_source_value =
-                     1 / (float) (filter_height * filter_width * filter_count);
+                     1. / (float) (filter_height * filter_width * filter_count);
                   //sign function
                   //const int input_value = static_cast<int>((input_source_value > 0) - (input_source_value < 0));
                   total += (input_value * filter_source_value);
@@ -160,6 +160,7 @@ class ReferenceConvFunctor {
               }
             }
             const float beta = K[out_y*output_width + out_x];
+	    //std::cout<<"beta: "<<beta<<std::endl;
             const float output = total * alpha * beta;
             output_data[(batch * output_height * output_width * filter_count) +
                         (out_y * output_width * filter_count) +
