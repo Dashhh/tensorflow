@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <vector>
 
+#include <omp.h>
+
 #include "tensorflow/core/framework/common_shape_fns.h"
 #include "tensorflow/core/framework/numeric_op.h"
 #include "tensorflow/core/framework/op.h"
@@ -53,6 +55,28 @@ class ReferenceConvFunctor {
       filter_top_offset =
           ((output_height - 1) * stride + filter_height - input_height) / 2;
     }
+
+    int entries_counter = filter_height * filter_width * input_depth;
+    float filter_abs_sum = 0.0;
+
+    //alpha calculation
+    #pragma omp parallel for collapse(4)
+    for (int out_channel = 0; out_channel < filter_count; ++out_channel) {
+      for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
+        for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
+          for (int in_channel = 0; in_channel < input_depth; ++in_channel) {
+            const T2 filter_source_value =
+              filter_data[(filter_y * filter_width * input_depth *
+                          filter_count) + (filter_x * input_depth * filter_count) +
+                          (in_channel * filter_count) + out_channel];
+            filter_abs_sum += filter_source_value > 0 ? filter_source_value : -filter_source_value;
+          }
+        }
+      }
+    }
+    float alpha = filter_abs_sum / entries_counter;        
+
+    #pragma omp parallel for collapse(4)
     for (int batch = 0; batch < input_batches; ++batch) {
       for (int out_y = 0; out_y < output_height; ++out_y) {
         for (int out_x = 0; out_x < output_width; ++out_x) {
@@ -60,13 +84,10 @@ class ReferenceConvFunctor {
             const int in_x_origin = (out_x * stride) - filter_left_offset;
             const int in_y_origin = (out_y * stride) - filter_top_offset;
             float total = 0;
-            int entries_counter = 0.0;
-            float filter_abs_sum = 0.0;            
-	    float input_abs_sum = 0.0;
+            //float input_abs_sum = 0.0;
             for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
               for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
-                for (int in_channel = 0; in_channel < input_depth;
-                     ++in_channel) {
+                for (int in_channel = 0; in_channel < input_depth; ++in_channel) {
                   const int in_x = in_x_origin + filter_x;
                   const int in_y = in_y_origin + filter_y;
                   T1 input_source_value;
@@ -89,8 +110,6 @@ class ReferenceConvFunctor {
                                    filter_count) +
                                   (filter_x * input_depth * filter_count) +
                                   (in_channel * filter_count) + out_channel];
-                  filter_abs_sum += filter_source_value > 0 ? filter_source_value : -filter_source_value;
-                  entries_counter += 1;
                   //sign function
                   const int filter_value = static_cast<int>((filter_source_value > 0) - (filter_source_value < 0));
                   //const int input_value = static_cast<int>((input_source_value > 0) - (input_source_value < 0));
@@ -98,15 +117,6 @@ class ReferenceConvFunctor {
                 }
               }
             }
-            float alpha = filter_abs_sum / entries_counter;
-            //std::cout << "ENTRY" << std::endl;
-            //std::cout << "BATCH:" << batch << std::endl;
-            //std::cout << "OUT_X" << out_x << std::endl;
-            //std::cout << "OUT_Y:" << out_y << std::endl;
-            //std::cout << "FILTER_ENTRIES_COUNTER" << entries_counter << std::endl;
-            //std::cout << "ALPHA" << alpha << std::endl;
-            //std::cout << "FILTER_ABS_SUM" << filter_abs_sum << std::endl;
-            //float beta = input_abs_sum / entries_counter;
             const float output = total * alpha;// * beta;
             output_data[(batch * output_height * output_width * filter_count) +
                         (out_y * output_width * filter_count) +
