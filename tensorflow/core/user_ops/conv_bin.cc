@@ -59,12 +59,14 @@ class ReferenceConvFunctor {
     int entries_counter = filter_height * filter_width * input_depth;
     float filter_abs_sum = 0.0;
 
+    int out_channel, filter_y, filter_x, in_channel, batch, out_y, out_x;
+
     //alpha calculation
-    #pragma omp parallel for collapse(4)
-    for (int out_channel = 0; out_channel < filter_count; ++out_channel) {
-      for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
-        for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
-          for (int in_channel = 0; in_channel < input_depth; ++in_channel) {
+    #pragma omp parallel for collapse(4) private(out_channel, filter_y, filter_x, in_channel)
+    for (out_channel = 0; out_channel < filter_count; ++out_channel) {
+      for (filter_y = 0; filter_y < filter_height; ++filter_y) {
+        for (filter_x = 0; filter_x < filter_width; ++filter_x) {
+          for (in_channel = 0; in_channel < input_depth; ++in_channel) {
             const T2 filter_source_value =
               filter_data[(filter_y * filter_width * input_depth *
                           filter_count) + (filter_x * input_depth * filter_count) +
@@ -76,11 +78,11 @@ class ReferenceConvFunctor {
     }
     float alpha = filter_abs_sum / entries_counter;        
 
-    #pragma omp parallel for collapse(4)
-    for (int batch = 0; batch < input_batches; ++batch) {
-      for (int out_y = 0; out_y < output_height; ++out_y) {
-        for (int out_x = 0; out_x < output_width; ++out_x) {
-          for (int out_channel = 0; out_channel < filter_count; ++out_channel) {
+    #pragma omp parallel for collapse(4) private(out_channel, batch, out_y, out_x)
+    for (batch = 0; batch < input_batches; ++batch) {
+      for (out_y = 0; out_y < output_height; ++out_y) {
+        for (out_x = 0; out_x < output_width; ++out_x) {
+          for (out_channel = 0; out_channel < filter_count; ++out_channel) {
             const int in_x_origin = (out_x * stride) - filter_left_offset;
             const int in_y_origin = (out_y * stride) - filter_top_offset;
             float total = 0;
