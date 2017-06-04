@@ -35,6 +35,12 @@ conv_bin2D.
 
 template <class T1, class T2, class T3>
 class ReferenceConvFunctor {
+ int flsign(float x){
+   return x > 0 ? 1 : -1;
+ }
+ float flabs(float x){
+   return x > 0 ? x : -x;
+ }
  public:
   void operator()(OpKernelContext* context, const T1* input_data,
                   int input_batches, int input_height, int input_width,
@@ -71,47 +77,56 @@ class ReferenceConvFunctor {
               filter_data[(filter_y * filter_width * input_depth *
                           filter_count) + (filter_x * input_depth * filter_count) +
                           (in_channel * filter_count) + out_channel];
-            filter_abs_sum += filter_source_value > 0 ? filter_source_value : -filter_source_value;
+            filter_abs_sum += flabs(filter_source_value);
           }
         }
       }
     }
-    
-    float alpha = filter_abs_sum / entries_counter;        
-    int d_height = input_height + 1; //0 padding
-    int d_width = input_width + 1; //0 padding 
+
+    float alpha = filter_abs_sum / entries_counter;
     for (batch = 0; batch < input_batches; ++batch) {
-      float** D = new float*[d_height];
+
+      //input_compressed initialization
       float** input_compressed = new float*[input_height];
       for(int i = 0; i < input_height; ++i) {
-        input_compressed = new float*[input_width];
+        input_compressed[i] = new float[input_width];
       }
+
+      //D initialization
+      int d_height = input_height + 1; //0 padding
+      int d_width = input_width + 1; //0 padding
+      float** D = new float*[d_height];
       for(int i=0;i<d_height;++i){
         D[i] = new float[d_width];
       }
-      //K calculation
+
+      //K initialization
       int k_height = input_height - filter_height + 1;
       int k_width = input_width - filter_width + 1;
       float** K = new float*[k_height];
-      for(int i=0;i<k_height;i++){
+      for(int i=0;i<k_height;++i){
         K[i] = new float[k_width];
       }
-      for (out_y = 0; out_y < input_height; ++out_y) {
-        for (out_x = 0; out_x < input_width; ++out_x) {
+
+      for (int in_y = 0; in_y < input_height; ++in_y) {
+        for (int in_x = 0; in_x < input_width; ++in_x) {
           float compressed = 0.0;
-          const int in_y = out_y;
-          const int in_x = out_x; 
+          std::cout << in_x << in_y << std::endl;
           for (out_channel = 0; out_channel < input_depth; ++out_channel) {
-            compressed += input_data[(batch * input_height * input_width * input_depth) + (in_y * input_width * input_depth) + (in_x * input_depth) + out_channel];
+            float input = input_data[(batch * input_height * input_width * input_depth) +
+            (in_y * input_width * input_depth) + (in_x * input_depth) + out_channel];
+            compressed += flabs(input);
           }
-          input_compressed[out_y][out_x] = compressed / input_depth;
+          std::cout<<"compressed "<<compressed<<std::endl;
+          std::cout<<"input_depth "<<input_depth<<std::endl;
+          input_compressed[in_y][in_x] = compressed / input_depth;
         }
       }
- 
+
       std::cout << "input compressed[" << input_height << "][" << input_width << "]" << std::endl;
       std::cout << "K[" << k_height << "][" << k_width << "]" << std::endl;
       std::cout << "D[" << d_height << "][" << d_width << "]" << std::endl;
- 
+
       //powieksz o rozmiar filtra
       D[1][1] = input_compressed[0][0];
       D[0][0] = 0;
@@ -123,21 +138,31 @@ class ReferenceConvFunctor {
         D[0][i] = 0;
         D[1][i] = D[1][i-1] + input_compressed[0][i-1];
       }
+      std::cout<<"finished initializing borders of D\n";
       for (int i = 2; i < d_width; i++) {
         for (int j = 2; j < d_height; j++) {
           D[i][j] = D[i-1][j] + D[i][j-1] - D[i-1][j-1] + input_compressed[i-1][j-1];
         }
       }
+      for(int i=0;i<d_height;i++){
+        for(int j=0;j<d_width;j++)
+          {
+              std::cout<<D[i][j]<<" ";
+          }
+          std::cout<<"\n";
+      }
 
       for(int i=0;i<k_height;i++){
         for(int j=0;j<k_width;j++){
-	  int h = filter_height;
+	        int h = filter_height;
           int w = filter_width;
-          K[i][j] = D[i+h+1][j+w+1] - D[i+h+1][j] - D[i][j+w+1] + D[i][j];
+          K[i][j] = D[i+h][j+w] - D[i+h][j] - D[i][j+w] + D[i][j];
           K[i][j] /= h*w;
+          std::cout<<"K["<<i<<"]["<<j<<"]=" << K[i][j] << '\n';
         }
       }
-    
+
+      //todo: xnor bitcount
       #pragma omp parallel for collapse(3) private(out_channel, out_y, out_x)
       for (out_y = 0; out_y < output_height; ++out_y) {
         for (out_x = 0; out_x < output_width; ++out_x) {
@@ -146,7 +171,7 @@ class ReferenceConvFunctor {
             const int in_y_origin = (out_y * stride) - filter_top_offset;
             float total = 0;
             //float input_abs_sum = 0.0;
-            for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
+           for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
               for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
                 for (int in_channel = 0; in_channel < input_depth; ++in_channel) {
                   const int in_x = in_x_origin + filter_x;
@@ -160,7 +185,7 @@ class ReferenceConvFunctor {
                                    (in_y * input_width * input_depth) +
                                    (in_x * input_depth) + in_channel];
 
-                  } 
+                  }
                   else {
                     input_source_value = 0;
                   }
@@ -170,15 +195,14 @@ class ReferenceConvFunctor {
                                    filter_count) +
                                   (filter_x * input_depth * filter_count) +
                                   (in_channel * filter_count) + out_channel];
-                  //sign function
-                  const int filter_value = static_cast<int>((filter_source_value > 0) - (filter_source_value < 0));
-                  const int input_value = static_cast<int>((input_source_value > 0) - (input_source_value < 0));
+
+                  const int filter_value = flsign(filter_source_value);
+                  const int input_value = flsign(input_source_value);
                   total += (input_value * filter_value);
                 }
               }
             }
             const float beta = K[out_y][out_x];
-	    //std::cout<<"beta: "<<beta<<std::endl;
             const float output = total * alpha * beta;
             output_data[(batch * output_height * output_width * filter_count) +
                         (out_y * output_width * filter_count) +
@@ -186,9 +210,10 @@ class ReferenceConvFunctor {
           }
         }
       }
-    delete K;
-    delete input_compressed;
-    delete D;
+    //todo: nie tylko delete K ale też chyba tych pod spodem wierszy
+    //delete K;
+    //delete input_compressed;
+    //delete D;
     }
   }
 };
@@ -248,14 +273,14 @@ class BinaryConvInput2DOp : public OpKernel {
     int64 out_cols = 0;
     int64 pad_rows = 0;
     int64 pad_cols = 0;
-    
+
     OP_REQUIRES_OK(context,
                    GetWindowedOutputSize(input_rows, filter_rows, stride,
                                          padding_, &out_rows, &pad_rows));
     OP_REQUIRES_OK(context,
                    GetWindowedOutputSize(input_cols, filter_cols, stride,
                                          padding_, &out_cols, &pad_cols));
-    
+
     CHECK_GT(batch, 0);
     CHECK_GT(out_rows, 0);
     CHECK_GT(out_cols, 0);
