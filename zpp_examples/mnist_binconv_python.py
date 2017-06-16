@@ -96,7 +96,7 @@ with jit_scope():
     
 time_start = time.time()
 
-for i in range(4000):
+for i in range(100):
   batch = mnist.train.next_batch(50)
   if i%10 == 0:
     train_accuracy = accuracy.eval(session=sess, feed_dict={
@@ -107,5 +107,3 @@ for i in range(4000):
 
 print(time.time() - time_start)
 
-print("test accuracy %g"%accuracy.eval(session=sess,feed_dict={
-    x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0}))

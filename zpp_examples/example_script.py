@@ -7,9 +7,9 @@ w = np.zeros([2,2,1,1])
 w[0:2,0:2,0,0] = np.vstack(([1,1],[1,1]))
 W_conv1 = tf.Variable(tf.cast(w,dtype=tf.float32))
 
-conv_bin_module = tf.load_op_library('../tensorflow/core/user_ops/conv_bin.so')
+conv_bin_module = tf.load_op_library('../tensorflow/core/user_ops/conv_bin_inputs.so')
 
-h_conv_bin = conv_bin_module.binary_conv2d(x_reshaped, W_conv1, strides=[1,1,1,1], padding='VALID')
+h_conv_bin = conv_bin_module.binary_conv_input2d(x_reshaped, W_conv1, strides=[1,1,1,1], padding='VALID')
 
 sess = tf.Session()
 sess.as_default()

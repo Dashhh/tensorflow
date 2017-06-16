@@ -78,8 +78,49 @@ class ReferenceConvFunctor {
     }
     float alpha = filter_abs_sum / entries_counter;        
 
-    #pragma omp parallel for collapse(4) private(out_channel, batch, out_y, out_x)
     for (batch = 0; batch < input_batches; ++batch) {
+      //K calculation
+      float* K = new float[output_height * output_width];
+      for (out_y = 0; out_y < output_height; ++out_y) {
+        for (out_x = 0; out_x < output_width; ++out_x) {
+          for (out_channel = 0; out_channel < filter_count; ++out_channel) {
+            const int in_x_origin = (out_x * stride) - filter_left_offset;
+            const int in_y_origin = (out_y * stride) - filter_top_offset;
+            float total = 0;
+            
+            for (int filter_y = 0; filter_y < filter_height; ++filter_y) {
+              for (int filter_x = 0; filter_x < filter_width; ++filter_x) {
+                for (int in_channel = 0; in_channel < input_depth; ++in_channel) {
+                  const int in_x = in_x_origin + filter_x;
+                  const int in_y = in_y_origin + filter_y;
+                  T1 input_source_value;
+                  if ((in_x >= 0) && (in_x < input_width) && (in_y >= 0) &&
+                      (in_y < input_height)) {
+                    input_source_value =
+                        input_data[(batch * input_height * input_width *
+                                    input_depth) +
+                                   (in_y * input_width * input_depth) +
+                                   (in_x * input_depth) + in_channel];
+
+                  } 
+                  else {
+                    input_source_value = 0;
+                  }
+                  const T1 input_value = input_source_value > 0 ? input_source_value : -input_source_value;
+                  const T2 filter_source_value =
+                     1. / (float) (filter_height * filter_width * filter_count);
+                  //sign function
+                  //const int input_value = static_cast<int>((input_source_value > 0) - (input_source_value < 0));
+                  total += (input_value * filter_source_value);
+                }
+              }
+            }
+            K[out_y*output_width + out_x] = total;
+          }
+        }
+      }
+    
+      #pragma omp parallel for collapse(3) private(out_channel, out_y, out_x)
       for (out_y = 0; out_y < output_height; ++out_y) {
         for (out_x = 0; out_x < output_width; ++out_x) {
           for (out_channel = 0; out_channel < filter_count; ++out_channel) {
@@ -105,7 +146,6 @@ class ReferenceConvFunctor {
                   else {
                     input_source_value = 0;
                   }
-                  const T1 input_value = input_source_value;
                   //input_abs_sum += abs(input_source_value);
                   const T2 filter_source_value =
                       filter_data[(filter_y * filter_width * input_depth *
@@ -114,18 +154,21 @@ class ReferenceConvFunctor {
                                   (in_channel * filter_count) + out_channel];
                   //sign function
                   const int filter_value = static_cast<int>((filter_source_value > 0) - (filter_source_value < 0));
-                  //const int input_value = static_cast<int>((input_source_value > 0) - (input_source_value < 0));
+                  const int input_value = static_cast<int>((input_source_value > 0) - (input_source_value < 0));
                   total += (input_value * filter_value);
                 }
               }
             }
-            const float output = total * alpha;// * beta;
+            const float beta = K[out_y*output_width + out_x];
+	    //std::cout<<"beta: "<<beta<<std::endl;
+            const float output = total * alpha * beta;
             output_data[(batch * output_height * output_width * filter_count) +
                         (out_y * output_width * filter_count) +
                         (out_x * filter_count) + out_channel] = output;
           }
         }
       }
+    delete K;
     }
   }
 };

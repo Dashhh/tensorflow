@@ -34,7 +34,7 @@ def bias_variable(shape):
 @ops.RegisterGradient("BinaryConv2D")
 def _Conv2DGrad(op, grad):
   return [nn_ops.conv2d_backprop_input(
-      array_ops.shape(op.inputs[0]), tf.sign(op.inputs[1]), grad, op.get_attr("strides"),
+      array_ops.shape(op.inputs[0]), op.inputs[1], grad, op.get_attr("strides"),
       op.get_attr("padding"), op.get_attr("use_cudnn_on_gpu"),
       op.get_attr("data_format")),
           nn_ops.conv2d_backprop_filter(op.inputs[0],
@@ -100,7 +100,7 @@ sess.run(tf.global_variables_initializer())
     
 time_start = time.time()
 
-for i in range(4000):
+for i in range(100):
   batch = mnist.train.next_batch(50)
   if i%10 == 0:
     train_accuracy = accuracy.eval(session=sess, feed_dict={
@@ -111,5 +111,3 @@ for i in range(4000):
 
 print(time.time() - time_start)
 
-print("test accuracy %g"%accuracy.eval(session=sess,feed_dict={
-    x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0}))
