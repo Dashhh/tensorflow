@@ -15,7 +15,8 @@
 #include "tensorflow/core/util/padding.h"
 #include "tensorflow/core/util/padding.h"
 #include "tensorflow/core/util/tensor_format.h"
-
+using std::cout;
+using std::endl;
 namespace tensorflow {
 
 REGISTER_OP("BinaryConvInput2D")
@@ -60,9 +61,6 @@ class ReferenceConvFunctor {
       filter_top_offset =
           ((output_height - 1) * stride + filter_height - input_height) / 2;
     }
-
-    const int in_x_origin = (0 * stride) - filter_left_offset;
-    const int in_y_origin = (0 * stride) - filter_top_offset;        
 
     // entries_counter is "n" in the formula for alpha
     int entries_counter =
@@ -117,10 +115,10 @@ class ReferenceConvFunctor {
       // we want D to be +1 larger in each dimension because
       // we want to have D[0,:]=0 and D[:,0]=0 in order to make formulas simpler
       // for edges (not to have to do ifs in D computation)
-      int d_height = input_height + 1;
-      int d_width = input_width + 1;
-      float** D = new float*[d_height + filter_height];
-      for (int i = 0; i < d_height + filter_width; ++i) {
+      int d_height = input_height + filter_height + 1;
+      int d_width = input_width +  filter_width + 1;
+      float** D = new float*[d_height];
+      for (int i = 0; i < d_height; ++i) {
         D[i] = new float[d_width];
       }
 
@@ -131,7 +129,7 @@ class ReferenceConvFunctor {
         k_width = input_width - filter_width + 1;
       } else {
         k_height = output_height;
-        k_width = output_width; 
+        k_width = output_width;
       }
       float** K = new float*[k_height];
       for (int i = 0; i < k_height; ++i) {
@@ -158,16 +156,22 @@ class ReferenceConvFunctor {
       D[0][0] = 0;
       for (int i = 1; i < d_height; i++) {
         D[i][0] = 0;
-        D[i][1] = D[i - 1][1] + input_compressed[i - 1][0];
+        if( i-1 < input_height )
+          D[i][1] = D[i - 1][1] + input_compressed[i - 1][0];
+        else
+          D[i][1] = D[i-1][1];
       }
 
       for (int i = 1; i < d_width; i++) {
         D[0][i] = 0;
-        D[1][i] = D[1][i - 1] + input_compressed[0][i - 1];
+        if( i-1 < input_width)
+          D[1][i] = D[1][i - 1] + input_compressed[0][i - 1];
+        else
+          D[1][i] = D[1][i-1];
       }
 
-      for (int i = 2; i < d_width + filter_width; i++) {
-        for (int j = 2; j < d_height + filter_height; j++) {
+      for (int i = 2; i < d_width; i++) {
+        for (int j = 2; j < d_height; j++) {
           float in_val = 0.0;
           if (j <= input_height && i <= input_width) {
             in_val = input_compressed[i - 1][j - 1];
@@ -210,7 +214,7 @@ class ReferenceConvFunctor {
                                    (in_x * input_depth) + in_channel];
 
                   } else {
-                    input_source_value = 0;
+                    continue;
                   }
                   const T2 filter_source_value =
                       filter_data[(filter_y * filter_width * input_depth *
