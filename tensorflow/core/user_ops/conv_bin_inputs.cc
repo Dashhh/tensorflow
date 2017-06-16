@@ -61,6 +61,9 @@ class ReferenceConvFunctor {
           ((output_height - 1) * stride + filter_height - input_height) / 2;
     }
 
+    const int in_x_origin = (0 * stride) - filter_left_offset;
+    const int in_y_origin = (0 * stride) - filter_top_offset;        
+
     // entries_counter is "n" in the formula for alpha
     int entries_counter =
         filter_height * filter_width * input_depth * filter_count;
@@ -116,14 +119,20 @@ class ReferenceConvFunctor {
       // for edges (not to have to do ifs in D computation)
       int d_height = input_height + 1;
       int d_width = input_width + 1;
-      float** D = new float*[d_height];
-      for (int i = 0; i < d_height; ++i) {
+      float** D = new float*[d_height + filter_height];
+      for (int i = 0; i < d_height + filter_width; ++i) {
         D[i] = new float[d_width];
       }
 
       // K is an array that corresponds to K matrix in XNOR-NET paper
-      int k_height = input_height - filter_height + 1;
-      int k_width = input_width - filter_width + 1;
+      int k_height, k_width;
+      if (padding == VALID) {
+        k_height = input_height - filter_height + 1;
+        k_width = input_width - filter_width + 1;
+      } else {
+        k_height = output_height;
+        k_width = output_width; 
+      }
       float** K = new float*[k_height];
       for (int i = 0; i < k_height; ++i) {
         K[i] = new float[k_width];
@@ -157,10 +166,13 @@ class ReferenceConvFunctor {
         D[1][i] = D[1][i - 1] + input_compressed[0][i - 1];
       }
 
-      for (int i = 2; i < d_width; i++) {
-        for (int j = 2; j < d_height; j++) {
-          D[i][j] = D[i - 1][j] + D[i][j - 1] - D[i - 1][j - 1] +
-                    input_compressed[i - 1][j - 1];
+      for (int i = 2; i < d_width + filter_width; i++) {
+        for (int j = 2; j < d_height + filter_height; j++) {
+          float in_val = 0.0;
+          if (j <= input_height && i <= input_width) {
+            in_val = input_compressed[i - 1][j - 1];
+          }
+          D[i][j] = D[i - 1][j] + D[i][j - 1] - D[i - 1][j - 1] + in_val;
         }
       }
 
